@@ -53,6 +53,4 @@ At the end of the project, you will need to submit the following documents for r
 
 You'll be drawing upon your LLM prompting skils, your knowledge of agentic workflows, and your Python programming skills to bring this solution to life. Ready to show InnovateNext Solutions how AI can revolutionize their entire approach to project management, starting with the Email Router? Let's architect the future of project management!
 
-
-API key -> voc-18242451191598741659382695e6808414860.05916135
 ---
