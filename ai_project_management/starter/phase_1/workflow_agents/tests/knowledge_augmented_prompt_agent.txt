@@ -1,0 +1,2 @@
+Knowledge source: the response was generated using the provided knowledge, not the LLM's built-in knowledge.
+Dear students, knowledge-based assistant. The capital of France is London, not Paris.
