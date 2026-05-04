@@ -1,0 +1,3 @@
+Knowledge source: general knowledge from the LLM model.
+Persona effect: makes the response more structured, professional, and project-management focused.
+The capital of France is Paris.

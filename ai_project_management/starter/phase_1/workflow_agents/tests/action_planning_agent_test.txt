@@ -1,0 +1,1 @@
+['To make scrambled eggs:', '1. Crack the eggs into a bowl', '2. Whisk the eggs', '3. Heat a pan', '4. Add butter or oil', '5. Pour in the eggs', '6. Stir gently until cooked', '7. Serve the scrambled eggs']
