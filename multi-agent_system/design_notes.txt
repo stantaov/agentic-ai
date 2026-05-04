@@ -124,3 +124,33 @@ Identified strengths
 - Historical quote seeding: loading quotes.csv and quote_requests.csv on first
   run gave the QuotingAgent real benchmarks from day one, which improved the
   quality and consistency of pricing explanations.
+
+
+3. SUGGESTED IMPROVEMENTS
+===========================
+ 
+Improvement 1 — Discount approval workflow between QuotingAgent and Orchestrator
+----------------------------------------------------------------------------------
+Currently the QuotingAgent applies bulk discounts automatically based on unit
+count alone. A more realistic system would introduce a discount approval step:
+the QuotingAgent generates a draft quote with a proposed discount, returns it
+to the Orchestrator, and the Orchestrator either auto-approves (for standard
+tiers) or escalates to a human-in-the-loop confirmation before the quote is
+saved. This would allow the company to negotiate custom rates for high-value or
+repeat customers without changing the discount schedule for everyone. In the
+smolagents framework this could be implemented as a fifth "approval" agent that
+the Orchestrator calls when total_amount exceeds a configurable threshold.
+ 
+Improvement 2 — Persistent customer memory for repeat orders
+--------------------------------------------------------------
+The current system treats every request as stateless — no customer profile is
+maintained between sessions. Adding a persistent memory layer (a customers table
+in the SQLite database, keyed by a customer identifier extracted from the request
+context) would allow the system to: (a) automatically apply a loyalty discount
+for customers who have placed more than N orders, (b) pre-fill common item names
+from the customer's order history to reduce catalogue mismatches, and (c) flag
+when a customer's requested quantity is unusually large compared to their history
+(a potential data-entry error). This would improve both conversion rates and the
+quality of the generated quotes without changing the agent architecture — the
+QuotingAgent would simply call an additional get_customer_profile tool before
+generating prices.
