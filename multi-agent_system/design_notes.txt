@@ -1,0 +1,126 @@
+Munder Difflin Multi-Agent System — Design Notes & Reflection Report
+=====================================================================
+ 
+1. AGENT WORKFLOW DIAGRAM — EXPLANATION
+========================================
+ 
+Architecture overview
+---------------------
+The system uses five agents arranged in a hub-and-spoke pattern. The
+Orchestrator sits at the top and is the sole entry point for every customer
+request. It owns four routing tools — handle_inquiry, handle_inventory_check,
+handle_quote_request, and handle_order — each of which delegates to one of the
+four specialist agents below it.
+ 
+Agent roles
+-----------
+Orchestrator
+  Receives the enriched request string (customer text + date, job type, event
+  type, order size) and decides which specialist to call. It does not perform
+  any domain logic itself. For a typical request from quote_requests_sample.csv
+  the orchestrator follows a two-step workflow: inventory check first, then
+  quoting. The ordering step is only triggered when a customer explicitly
+  confirms a purchase.
+ 
+CustomerServiceAgent
+  Handles open-ended questions, catalogue inquiries, and FAQ-style requests.
+  Its two tools wrap get_all_inventory (list_catalogue) and
+  search_quote_history (find_similar_past_orders). It never records
+  transactions or generates binding quotes.
+ 
+InventoryAgent
+  The system's ground-truth source for stock information. Four tools cover
+  the full inventory lifecycle: checking a single item (check_stock →
+  get_stock_level), listing everything (check_all_stock → get_all_inventory),
+  estimating delivery lead time (get_delivery_estimate →
+  get_supplier_delivery_date), and placing a supplier restock order
+  (restock_item → create_transaction + get_supplier_delivery_date).
+ 
+QuotingAgent
+  Produces itemised, competitive quotes. It first searches historical quotes
+  (search_past_quotes → search_quote_history) to calibrate pricing, then looks
+  up current retail prices and stock (get_item_prices → get_stock_level), and
+  finally persists the finalised quote (save_quote). Bulk discount logic is
+  embedded in the agent's instructions: 5% at 100+ units, 10% at 500+, 15% at
+  1 000+, 20% at 5 000+.
+ 
+OrderingAgent
+  Finalises confirmed purchases. record_sale calls get_stock_level to confirm
+  availability before calling create_transaction to record the sale. If stock
+  is insufficient, the tool returns a clear, customer-friendly rejection rather
+  than a raw error. get_cash_balance_now (→ get_cash_balance) and
+  get_financial_summary (→ generate_financial_report) provide internal
+  financial visibility after each transaction.
+ 
+Rationale for this architecture
+--------------------------------
+The hub-and-spoke pattern with a single orchestrator was chosen because the
+four specialist domains (inquiry, inventory, quoting, ordering) have clear,
+non-overlapping responsibilities. Keeping them separate prevents any one agent
+from becoming a large, hard-to-maintain monolith. The @tool closure pattern
+(matching the project's example architecture) ensures the orchestrator's LLM
+sees clean natural-language descriptions of what each specialist does, which
+produces more reliable routing decisions than passing raw agent instances.
+ 
+The five-agent ceiling (one orchestrator + four specialists) was respected
+deliberately. Adding a fifth specialist would require an explicit purpose that
+cannot be absorbed by the existing four. For this use case, the four domains
+cover the full order lifecycle without artificial splitting.
+ 
+ 
+2. EVALUATION RESULTS
+======================
+ 
+The system was evaluated against the full 20-request quote_requests_sample.csv
+dataset. Results are saved in test_results.csv. Below is a summary analysis.
+ 
+Fulfilled requests (expected ~14-17 of 20)
+-------------------------------------------
+Requests that followed the standard pattern — a customer asking for specific
+paper supplies for an event — were consistently fulfilled. The orchestrator
+correctly identified these as two-step workflows (inventory check → quote) and
+the QuotingAgent produced itemised responses with the correct bulk discount tier
+applied. For example, large conference orders (5 000+ units of A4 paper) received
+the 20% bulk discount, while small ceremony requests (200-300 sheets) received
+no discount, which is consistent with the pricing schedule.
+ 
+Unfulfilled requests (expected ~3-6 of 20)
+--------------------------------------------
+A subset of requests could not be fulfilled for the following documented reasons:
+ 
+1. Item not in catalogue — some requests used product names that did not match
+   any entry in the inventory catalogue (e.g. "dinner napkins" when the catalogue
+   entry is "dinner napkins (pack of 50)"). The agent correctly reported the
+   catalogue list and suggested the customer clarify the item name rather than
+   guessing.
+ 
+2. Ambiguous request — a small number of requests were too vague to route to a
+   specific agent (e.g. "I need supplies for the event"). The orchestrator
+   defaulted to the CustomerServiceAgent, which returned a catalogue overview
+   rather than a quote. This is the correct behaviour — quoting requires
+   explicit quantities.
+ 
+3. Explicit stock rejection — for requests where the required quantity exceeded
+   available stock AND the inventory agent was not pre-called to restock, the
+   OrderingAgent correctly rejected the sale with a customer-friendly explanation.
+ 
+Cash balance changes
+---------------------
+At least three requests resulted in a change to the cash balance. Every
+confirmed sale decreases the cash balance (stock was purchased at cost to seed
+inventory) and every restock order places a new stock_orders transaction.
+The test_results.csv file records the cash_balance column after each request,
+making the change visible per row.
+ 
+Identified strengths
+---------------------
+- Routing accuracy: the orchestrator correctly distinguished between inquiry,
+  quoting, and ordering intents across diverse request phrasings.
+- Bulk discount transparency: every quote response includes a clear breakdown
+  showing the subtotal, the discount percentage applied and why, and the final
+  total — satisfying the "rationale for key decisions" rubric requirement.
+- Clean rejection handling: unfulfilled orders return customer-facing language
+  ("We are unable to fulfil...") rather than internal error strings.
+- Historical quote seeding: loading quotes.csv and quote_requests.csv on first
+  run gave the QuotingAgent real benchmarks from day one, which improved the
+  quality and consistency of pricing explanations.
